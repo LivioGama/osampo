@@ -1,0 +1,19 @@
+[package]
+name = "osampo-daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+libc = "0.2"
+async-trait = "0.1"
+btleplug = "0.13.1"
+uuid = "1"   # deja tire par btleplug : filtre de scan sur le service du chiot
+futures = "0.3"   # deja tire par btleplug : Stream des notifications ETAT
+x11-dl = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "io-util"] }
+osampo-config = { path = "../crates/osampo-config" }
+toml = "1"
+nix = { version = "0.31", features = ["term", "fs"] }

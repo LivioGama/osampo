@@ -1,0 +1,21 @@
+# ESP-IDF
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+
+# Rust
+target/
+
+# Node (LikeC4)
+node_modules/
+
+# Python
+__pycache__/
+.pytest_cache/
+
+# divers
+.DS_Store
+*.swp
+.superpowers/

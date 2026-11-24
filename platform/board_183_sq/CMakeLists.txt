@@ -1,0 +1,26 @@
+idf_component_register(
+    SRCS "src/board.cpp"
+         "src/display.cpp"
+         "src/touch.cpp"
+         "src/backlight.cpp"
+         "src/i2c_bus.cpp"
+         "src/audio.cpp"
+         "src/rtc.cpp"
+         "src/storage.cpp"
+         "src/console.cpp"
+         "src/imu.cpp"
+         "src/ble.cpp"
+         "src/power.cpp"
+         "src/button.cpp"
+         "logic/pcf85063.cpp"
+         "logic/wav.cpp"
+         "logic/line_buffer.cpp"
+         "logic/axp2101.cpp"
+         "logic/es8311.cpp"
+         "logic/vbat_log.cpp"
+         "logic/nvs_migration.cpp"
+    INCLUDE_DIRS "include"
+    PRIV_INCLUDE_DIRS "logic" "src"
+    REQUIRES driver esp_lcd esp_timer esp_driver_ledc esp_driver_i2c esp_driver_spi esp_driver_gpio esp_driver_i2s nvs_flash esp_driver_usb_serial_jtag bt
+             espressif__esp_lcd_touch espressif__esp_lcd_touch_cst816s slint
+)

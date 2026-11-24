@@ -1,0 +1,41 @@
+# Manifeste de widget. Lu par le daemon (SP3), jamais par le firmware.
+id = "osampo"
+formats = ["square"]
+refresh_ms = 500
+stale_s = 30
+
+[[keys]]
+name = "epoch"
+type = "int"
+
+[[keys]]
+name = "tz_s"
+type = "int"
+
+[[keys]]
+name = "sage"
+type = "int" # jauge 0..100 (SP5h)
+
+[[keys]]
+name = "actif"
+type = "int" # 0/1 : clavier ou souris dans la derniere minute
+
+[[keys]]
+name = "absence_min"
+type = "int" # duree de l'absence en cours, 0 si actif
+
+[[keys]]
+name = "absence_finie_min"
+type = "int" # duree de la derniere absence terminee (promenade hors de portee)
+
+[[keys]]
+name = "absence_finie_age_min"
+type = "int" # minutes depuis la fin de cette absence, -1 sans absence terminee
+
+[[keys]]
+name = "claude_wait"
+type = "int" # 0/1, JsonLine n'a pas d'accesseur bool
+
+[[keys]]
+name = "age"
+type = "int"

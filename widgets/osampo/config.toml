@@ -1,0 +1,110 @@
+# Reglages du chiot Osampo.
+# Chaque cle ci-dessous est a sa valeur par defaut ; supprimer une ligne revient a la valeur par defaut.
+# Le daemon relit ce fichier au demarrage puis toutes les 2 s : un fichier invalide est refuse en entier.
+
+[rappels]
+# Delai de report d'un rappel, en minutes (1 a 120).
+report_min = 10
+# Duree pendant laquelle un rappel manque reste rattrapable, en minutes (1 a 720).
+rattrapage_min = 60
+# Delais des relances apres un rappel, en secondes : 1 a 3 valeurs de 10 a 3600, strictement croissantes.
+relances_s = [60, 180, 420]
+
+[chiot]
+# Duree de calme apres une validation, en minutes (1 a 120).
+calme_apres_validation_min = 10
+# Delai de la patte levee avant l'aboiement quand Claude attend, en minutes (1 a 60).
+patte_avant_aboie_min = 2
+
+[heures]
+# Heure de debut des heures calmes, au format "HH:MM" ; debut egal a fin : aucune heure calme.
+calme_debut = "22:00"
+# Heure de fin des heures calmes, au format "HH:MM".
+calme_fin = "07:00"
+# Heure de debut de la nuit, au format "HH:MM" ; debut egal a fin : jamais la nuit.
+nuit_debut = "20:00"
+# Heure de fin de la nuit, au format "HH:MM".
+nuit_fin = "07:00"
+
+[ecran]
+# Luminosite de l'ecran le jour, en pourcent (5 a 100).
+lum_jour = 100
+# Luminosite de l'ecran la nuit, en pourcent (5 a 100).
+lum_nuit = 20
+# Tension sous laquelle l'icone de batterie faible s'affiche, en millivolts (0 : jamais, ou 3000 a 4200).
+batterie_faible_mv = 0
+
+[besoins]
+# Baisse des besoins du chiot par jour, en points (0 a 100).
+baisse_par_jour = 15
+# Gain apporte par une action de soin, en points (0 a 100).
+gain = 20
+
+[gestes]
+# Acceleration qui declenche un lancer, en g (0.5 a 16).
+lancer_g = 2.0
+# Vitesse de rotation qui declenche un lancer, en degres par seconde (50 a 4000).
+lancer_dps = 300
+# Duree minimale du lancer, en millisecondes (10 a 1000).
+lancer_ms = 20
+# Acceleration qui compte comme un coup de secousse, en g (0.5 a 16).
+secousse_g = 2.0
+# Nombre de coups necessaires pour une secousse (2 a 20).
+secousse_coups = 4
+# Fenetre de temps pour reunir ces coups, en millisecondes (200 a 5000).
+secousse_fenetre_ms = 1000
+# Duree de la position retournee avant le geste, en millisecondes (200 a 10000).
+retourne_ms = 1500
+# Pause entre deux gestes, en millisecondes (0 a 10000).
+pause_gestes_ms = 1500
+# Journal des gestes : 0 muet, 1 une ligne par salve, 2 salve et echantillons bruts.
+journal = 0
+
+[clavier]
+# Touche du desktop qui simule un lancer, un seul caractere imprimable.
+lancer = "t"
+# Touche du desktop qui simule une secousse, differente des deux autres.
+secousse = "s"
+# Touche du desktop qui simule un retournement, differente des deux autres.
+retourner = "f"
+
+[promenade]
+# Temps passe au clavier et a la souris qui vide la jauge du chiot ; vide, il reclame la promenade, en minutes (1 a 600).
+vide_apres_min = 90
+# Absence du PC qui recharge un peu la jauge (promenade courte), en minutes (1 a 120).
+courte_min = 5
+# Absence du PC qui recharge la jauge entierement (promenade longue), en minutes (2 a 240, plus que courte_min).
+longue_min = 30
+# En dessous de ce niveau de jauge a la fin d'une promenade, il la redemande 10 min plus tard (0 a 100).
+seuil_reclame = 30
+# Activite au PC qui termine une promenade oubliee, en minutes (1 a 60).
+retour_min = 2
+
+[pc]
+# Cote de la fenetre du chien de osampo-pc, en pixels (32 a 256).
+chien_px = 64
+
+# Rappels a heure fixe, de 1 a 16. categorie : repas, sortie, sport ou dodo ; heure "HH:MM" ;
+# jours parmi lun mar mer jeu ven sam dim (tous si absent). sortie, sport et dodo reclament
+# la promenade (dodo : celle du soir, puis il dort) ; repas se valide d'un toucher.
+# Supprimer tous les [[rappel]] revient a cette liste.
+[[rappel]]
+categorie = "repas"
+heure = "12:00"
+
+[[rappel]]
+categorie = "sortie"
+heure = "12:30"
+
+[[rappel]]
+categorie = "sport"
+heure = "18:00"
+jours = ["lun", "mer", "ven"]
+
+[[rappel]]
+categorie = "repas"
+heure = "19:30"
+
+[[rappel]]
+categorie = "dodo"
+heure = "21:45"

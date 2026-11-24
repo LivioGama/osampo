@@ -1,0 +1,430 @@
+import { Theme } from "./theme.slint";
+
+// Le chiot, format square 240 x 284.
+//
+// Les planches sont des bandes horizontales de cases 64 x 64 (nombre de cases =
+// largeur / 64), affichees x3 en pixelated. La planche vient de `anim`, calcule
+// par le controleur (R-y) ; state et reason restent pour la bulle et le debug.
+export component ViewSquare inherits Window {
+    in property <string> state: "repos";
+    in property <string> reason: "";
+    in property <string> reminder: "";
+    in property <string> anim: "repos";
+    in property <bool> night: false;
+    in property <bool> clock-ok: false;
+    in property <bool> online: false;
+    // board seulement : le Bluetooth est connecte (icone bleue quand en ligne)
+    in property <bool> bluetooth: false;
+    // heure locale, -1 sans horloge (SP5e : remplace les icones de besoins)
+    in property <int> heure: -1;
+    in property <int> minute: -1;
+    // volume 0 (coupe) .. 3 (SP5e), bouton BOOT sur la board, touche v sur desktop
+    in-out property <int> volume: 2;
+    // SP5h : icone laisse (tout sauf dort), bulle de la promenade du soir, pile faible
+    in property <bool> laisse: false;
+    in property <bool> bulle-dodo: false;
+    in property <bool> batterie-faible: false;
+    // SP5k : allure du chiot en laisse ("pas" "trot" "course"), d'apres le podometre
+    // et duree d'une image de la marche, calee sur sa cadence. Desktop : "pas".
+    in property <string> allure: "pas";
+    in property <duration> marche-image: Theme.frame;
+
+    callback tapped();
+    callback long-pressed();
+    callback stroked();
+    callback anim-done();
+    // icone brosse touchee : bain (SP5e)
+    callback brossed();
+    // icone os touchee : il croque un os (SP5f)
+    callback os-donne();
+    // icone laisse touchee : depart ou fin de la promenade (SP5h)
+    callback laisse-touchee();
+    callback key(string);
+
+    title: "square 240x284";
+    width: 240px;
+    height: 284px;
+    forward-focus: keys;
+
+    // rapporte joue court, puis balle (il freine et ramasse), puis lache (de
+    // face, il lache la balle) (R-y). vers-la-droite : la balle est partie a
+    // droite, le chiot court et ramasse de ce cote (planches en miroir).
+    in property <bool> vers-la-droite: false;
+    property <int> phase: 0;
+    property <int> frame: 0;
+    property <bool> done-sent: false;
+    property <bool> looping: anim != "rapporte" && anim != "content" && anim != "roulade" && anim != "tournis" && anim != "bain" && anim != "os";
+    // bain joue bain (brossage), puis bain_mousse en boucle bain-tours fois,
+    // puis bain_fin (la mousse disparait) (SP5e).
+    property <int> bain-tours: 6;
+    // os joue os (il mache) en boucle os-tours fois, puis os_fin (SP5f).
+    property <int> os-tours: 5;
+    property <int> tours: 0;
+
+    property <image> sheet:
+        anim == "dort" ? @image-url("sprites/dort.png")
+        : anim == "aboie" ? @image-url("sprites/aboie.png")
+        : anim == "laisse" ? @image-url("sprites/laisse.png")
+        : anim == "promenade" && allure == "trot" ? @image-url("sprites/promenade_trot.png")
+        : anim == "promenade" && allure == "course" ? @image-url("sprites/promenade_course.png")
+        : anim == "promenade" ? @image-url("sprites/promenade.png")
+        : anim == "patte" ? @image-url("sprites/patte.png")
+        : anim == "content" ? @image-url("sprites/content.png")
+        : anim == "roulade" ? @image-url("sprites/roulade.png")
+        : anim == "rapporte" && phase == 0 ? (vers-la-droite ? @image-url("sprites/court_droite.png") : @image-url("sprites/court.png"))
+        : anim == "rapporte" && phase == 1 ? (vers-la-droite ? @image-url("sprites/balle_droite.png") : @image-url("sprites/balle.png"))
+        : anim == "rapporte" ? @image-url("sprites/lache.png")
+        : anim == "os" && phase == 0 ? @image-url("sprites/os.png")
+        : anim == "os" ? @image-url("sprites/os_fin.png")
+        : anim == "bain" && phase == 0 ? @image-url("sprites/bain.png")
+        : anim == "bain" && phase == 1 ? @image-url("sprites/bain_mousse.png")
+        : anim == "bain" ? @image-url("sprites/bain_fin.png")
+        : anim == "tournis" ? @image-url("sprites/tournis.png")
+        : anim == "boude" ? @image-url("sprites/boude.png")
+        : @image-url("sprites/repos.png");
+    property <int> frames: max(1, sheet.width / 64);
+
+    changed anim => {
+        phase = 0;
+        tours = 0;
+        frame = 0;
+        done-sent = false;
+    }
+
+    Timer {
+        interval: root.anim == "promenade" ? root.marche-image : Theme.frame;
+        triggered => {
+            if (root.frame + 1 < root.frames) {
+                root.frame += 1;
+            } else if (root.looping) {
+                root.frame = 0;
+            } else if (root.anim == "os" && root.phase == 0 && root.tours + 1 < root.os-tours) {
+                root.tours += 1;
+                root.frame = 0;
+            } else if (root.anim == "os" && root.phase == 0) {
+                root.phase = 1;
+                root.frame = 0;
+            } else if (root.anim == "bain" && root.phase == 1 && root.tours + 1 < root.bain-tours) {
+                root.tours += 1;
+                root.frame = 0;
+            } else if ((root.anim == "rapporte" || root.anim == "bain") && root.phase < 2) {
+                root.phase += 1;
+                root.frame = 0;
+            } else if (!root.done-sent) {
+                root.done-sent = true;
+                root.anim-done();
+            }
+        }
+    }
+
+    Image {
+        x: 0;
+        y: 0;
+        width: 240px;
+        height: 284px;
+        source: root.night ? @image-url("sprites/fond_nuit.png") : @image-url("sprites/fond_jour.png");
+    }
+
+    // niche derriere le chiot, meme cadre (placement de mockup() dans gen_assets.py)
+    if root.anim == "dort": Image {
+        x: (240px - 192px) / 2;
+        y: 284px - 192px;
+        width: 192px;
+        height: 192px;
+        source: @image-url("sprites/niche.png");
+        image-rendering: pixelated;
+    }
+
+    Image {
+        x: (240px - 192px) / 2;
+        y: 284px - 192px;
+        width: 192px;
+        height: 192px;
+        source: root.sheet;
+        source-clip-x: min(root.frame, root.frames - 1) * 64;
+        source-clip-y: 0;
+        source-clip-width: 64;
+        source-clip-height: 64;
+        image-rendering: pixelated;
+    }
+
+    // heure en haut a gauche, HH:MM ; les deux-points clignotent a la
+    // seconde (500 ms allumes, 500 ms eteints), sans decaler les chiffres.
+    property <bool> deux-points: true;
+    Timer {
+        interval: 500ms;
+        running: root.heure >= 0;
+        triggered => {
+            root.deux-points = !root.deux-points;
+        }
+    }
+    if root.heure >= 0: Rectangle {
+        x: 6px;
+        y: 6px;
+        width: 76px;
+        height: 32px;
+        border-radius: 8px;
+        background: Theme.clock-bg;
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                text: (root.heure < 10 ? "0" : "") + root.heure;
+                color: Theme.clock-fg;
+                font-size: 22px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            Text {
+                text: ":";
+                color: Theme.clock-fg;
+                opacity: root.deux-points ? 1 : 0;
+                font-size: 22px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            Text {
+                text: (root.minute < 10 ? "0" : "") + root.minute;
+                color: Theme.clock-fg;
+                font-size: 22px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    // haut-parleur en bas a gauche (SP5f : la place en haut va a l'os) : 2 s apres chaque changement de volume,
+    // en permanence quand le son est coupe (choix Claude).
+    property <bool> volume-vu: false;
+    changed volume => {
+        root.volume-vu = true;
+        cache-volume.running = false;
+        cache-volume.running = true;
+    }
+    cache-volume := Timer {
+        interval: 2s;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.volume-vu = false;
+        }
+    }
+    if root.volume-vu || root.volume == 0: Rectangle {
+        x: 6px;
+        y: 284px - 6px - 32px;
+        width: 40px;
+        height: 32px;
+        border-radius: 8px;
+        background: Theme.clock-bg;
+        Image {
+        x: 4px;
+        width: 32px;
+        height: 32px;
+        image-rendering: pixelated;
+        source: root.volume <= 0 ? @image-url("sprites/volume_0.png")
+            : root.volume == 1 ? @image-url("sprites/volume_1.png")
+            : root.volume == 2 ? @image-url("sprites/volume_2.png")
+            : @image-url("sprites/volume_3.png");
+        }
+    }
+
+    // hors ligne : plus de donnees fraiches du PC (SP5d2 B11, B12), a gauche
+    // de l'horloge barree quand les deux s'affichent.
+    if !root.online: Image {
+        x: root.clock-ok ? 240px - 6px - 32px : 240px - 6px - 32px - 4px - 32px;
+        y: 6px;
+        width: 32px;
+        height: 32px;
+        source: @image-url("sprites/lien_barre.png");
+        image-rendering: pixelated;
+    }
+
+    // en ligne par le Bluetooth : symbole bleu, meme place (demande de l'auteur)
+    if root.online && root.bluetooth: Image {
+        x: root.clock-ok ? 240px - 6px - 32px : 240px - 6px - 32px - 4px - 32px;
+        y: 6px;
+        width: 32px;
+        height: 32px;
+        source: @image-url("sprites/lien.png");
+        image-rendering: pixelated;
+    }
+
+    if !root.clock-ok: Image {
+        x: 240px - 6px - 32px;
+        y: 6px;
+        width: 32px;
+        height: 32px;
+        source: @image-url("sprites/horloge_barree.png");
+        image-rendering: pixelated;
+    }
+
+    // bulle du rappel, pres de la tete du chiot (R-z)
+    if root.reminder != "": Rectangle {
+        x: 150px;
+        y: 72px;
+        width: 72px;
+        height: 44px;
+        border-radius: 10px;
+        border-width: 2px;
+        border-color: Theme.bubble-border;
+        background: Theme.bubble-bg;
+
+        // SP5h P6 : la promenade du soir s'annonce par une bulle « dodo »
+        if root.reminder == "repas" || root.bulle-dodo: Text {
+            text: root.bulle-dodo ? "dodo" : "repas";
+            color: Theme.bubble-fg;
+            font-size: 16px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if root.reminder != "repas" && !root.bulle-dodo: Image {
+            width: 32px;
+            height: 32px;
+            image-rendering: pixelated;
+            source: @image-url("sprites/besoin_bouger_2.png");
+        }
+    }
+
+
+    // Gestes : glissement > stroke-min -> stroked, appui >= long-press ->
+    // long-pressed, sinon tapped au relachement.
+    keys := FocusScope {
+        // Une touche maintenue ne repete pas le geste (f basculerait en boucle).
+        key-pressed(event) => {
+            if (!event.repeat) {
+                root.key(event.text);
+            }
+            accept
+        }
+
+        touch := TouchArea {
+            property <bool> gesture-done: false;
+
+            pointer-event(event) => {
+                if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                    self.gesture-done = false;
+                    hold.running = true;
+                } else if (event.button == PointerEventButton.left && event.kind == PointerEventKind.up) {
+                    hold.running = false;
+                    if (!self.gesture-done) {
+                        self.gesture-done = true;
+                        root.tapped();
+                    }
+                }
+            }
+            moved => {
+                if (self.pressed && !self.gesture-done) {
+                    if ((self.mouse-x - self.pressed-x) / 1px * (self.mouse-x - self.pressed-x) / 1px
+                        + (self.mouse-y - self.pressed-y) / 1px * (self.mouse-y - self.pressed-y) / 1px
+                        > Theme.stroke-min / 1px * Theme.stroke-min / 1px) {
+                        self.gesture-done = true;
+                        hold.running = false;
+                        root.stroked();
+                    }
+                }
+            }
+        }
+
+        hold := Timer {
+            interval: Theme.long-press;
+            running: false;
+            triggered => {
+                self.running = false;
+                if (!touch.gesture-done) {
+                    touch.gesture-done = true;
+                    root.long-pressed();
+                }
+            }
+        }
+    }
+
+    // icone brosse en haut, a droite de l'heure (demande de l'auteur), au-dessus
+    // des gestes : la toucher lance le bain (SP5e). Pastille sombre comme
+    // l'horloge. Cachee quand le bain est impossible (il dort, reclame ou se promene).
+    if root.state != "dort" && root.state != "reclame" && root.state != "promenade": Rectangle {
+        x: 86px;
+        y: 6px;
+        width: 36px;
+        height: 32px;
+        border-radius: 8px;
+        background: Theme.clock-bg;
+        Image {
+            x: 2px;
+            y: 0px;
+            width: 32px;
+            height: 32px;
+            image-rendering: pixelated;
+            source: @image-url("sprites/brosse.png");
+        }
+        TouchArea {
+            clicked => {
+                root.brossed();
+            }
+        }
+    }
+
+    // icone os en haut, a droite de la brosse : la toucher lui donne un os a
+    // croquer (SP5f). Cachee quand il dort, reclame ou se promene.
+    if root.state != "dort" && root.state != "reclame" && root.state != "promenade": Rectangle {
+        x: 126px;
+        y: 6px;
+        width: 36px;
+        height: 32px;
+        border-radius: 8px;
+        background: Theme.clock-bg;
+        Image {
+            x: 2px;
+            y: 0px;
+            width: 32px;
+            height: 32px;
+            image-rendering: pixelated;
+            source: @image-url("sprites/os_icone.png");
+        }
+        TouchArea {
+            clicked => {
+                root.os-donne();
+            }
+        }
+    }
+
+    // icone laisse en haut, a droite de l'os (SP5h) : au repos pour partir a la
+    // demande, pendant une reclamation de promenade et pendant la promenade.
+    // Fond vert pendant la promenade : l'appuyer la termine.
+    if root.laisse: Rectangle {
+        x: 166px;
+        y: 6px;
+        width: 36px;
+        height: 32px;
+        border-radius: 8px;
+        background: root.state == "promenade" ? #3a7d2c : Theme.clock-bg;
+        Image {
+            x: 2px;
+            y: 0px;
+            width: 32px;
+            height: 32px;
+            image-rendering: pixelated;
+            source: @image-url("sprites/laisse_icone.png");
+        }
+        TouchArea {
+            clicked => {
+                root.laisse-touchee();
+            }
+        }
+    }
+
+    // pile vide sous l'icone du lien (SP5h P8) : la rangee du haut est pleine.
+    if root.batterie-faible: Rectangle {
+        x: 240px - 6px - 32px;
+        y: 42px;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: Theme.clock-bg;
+        Image {
+            width: 32px;
+            height: 32px;
+            image-rendering: pixelated;
+            source: @image-url("sprites/pile.png");
+        }
+    }
+}

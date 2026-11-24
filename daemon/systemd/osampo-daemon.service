@@ -1,0 +1,40 @@
+# Unite systemd utilisateur : le daemon nourrit le chiot (Osampo 1.83) par l'USB
+# et par le Bluetooth (--ble, SP5d2). Sans adaptateur Bluetooth, l'emetteur BLE
+# reessaie toutes les 5 s sans gener l'USB.
+#
+# Pose par installer/linux/installer.sh (binaire et widgets sous ~/.local).
+# A la main : copier dans ~/.config/systemd/user/, puis
+#   systemctl --user daemon-reload && systemctl --user enable --now osampo-daemon
+#
+# Liaison USB : ajouter --serial /dev/serial/by-id/<port de la board>
+# (`ls /dev/serial/by-id/`). Le port par-id survit a une renumerotation de
+# ttyACM*. Un seul programme a la fois sur le port : arreter l'unite avant
+# idf.py flash ou sync_time.py (systemctl --user stop osampo-daemon).
+#
+# L'activite clavier/souris vient de X : DISPLAY et XAUTHORITY sont fixes
+# ci-dessous. Le service demarre des la connexion (default.target), avant que
+# la session graphique n'exporte son environnement : un import-environment
+# arriverait trop tard, l'environnement du processus est fige au lancement.
+# Sans X, la source d'activite rend 0 (le reste continue).
+#
+# Pas d'After=graphical-session.target : cette cible reste inactive sur
+# Cinnamon/Mint, la dependance ne fait rien.
+
+[Unit]
+Description=Daemon Osampo (le chiot par l'USB et le Bluetooth)
+# Une erreur de demarrage permanente ne relance pas
+# a l'infini : 5 echecs en 300 s arretent l'unite.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/osampo-daemon --widgets-dir %h/.local/share/osampo/widgets --ble
+# Valeurs d'une session lightdm sur l'ecran :0 ; a adapter (echo $DISPLAY $XAUTHORITY).
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

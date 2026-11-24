@@ -1,0 +1,155 @@
+// Architecture d'Osampo / Osampo architecture (LikeC4).
+// Rendu : npx likec4 export png -o . .
+specification {
+  element actor {
+    style {
+      shape person
+    }
+  }
+  element system
+  element device
+  element app
+  element component
+  element store {
+    style {
+      shape storage
+    }
+  }
+  relationship ble
+  relationship usb
+  relationship local
+}
+
+model {
+  user = actor 'You' {
+    description 'Works at the PC, takes the puppy for walks'
+  }
+  claude = system 'Claude Code' {
+    description 'Coding agent; its hooks say when it waits for you'
+  }
+
+  board = device 'Osampo board' {
+    description 'Waveshare ESP32-S3-Touch-LCD-1.83: screen, touch, IMU, speaker, battery, RTC, Bluetooth'
+    technology 'ESP-IDF, C++'
+
+    firmware = app 'Puppy firmware' {
+      description 'Needs, moods, walks (pedometer), ball, bath, reminders; draws the puppy'
+      technology 'widgets/osampo/esp32 + src/logic'
+    }
+    ui = component 'Puppy UI' {
+      description 'Sprite sheets, backgrounds, icons'
+      technology 'Slint'
+    }
+    driver = component 'Board driver' {
+      description 'Display, touch, IMU, audio, power, RTC, NVS, BLE, buttons'
+      technology 'platform/board_183_sq'
+    }
+    linkB = component 'Link library' {
+      description 'JSON lines in and out'
+      technology 'platform/link_common'
+    }
+    firmware -> ui 'shows'
+    firmware -> driver 'uses'
+    firmware -> linkB 'reads and writes lines'
+  }
+
+  pc = system 'Linux PC' {
+    description 'Your desktop session'
+
+    daemon = app 'osampo-daemon' {
+      description 'Feeds the puppy: time, activity, Claude Code, reminders, the need gauge'
+      technology 'Rust, systemd user service'
+
+      sources = component 'Sources' {
+        description 'Clock, keyboard/mouse activity (X), Claude Code waits, gauge'
+        technology 'daemon/src/sources'
+      }
+      reminders = component 'Reminders and state' {
+        description 'PC-side reminders, what the tray dog shows'
+        technology 'daemon/src/pc'
+      }
+      emitters = component 'Emitters' {
+        description 'Bluetooth LE, USB serial, local socket'
+        technology 'daemon/src/emit'
+      }
+      sources -> emitters 'values'
+      reminders -> emitters 'events'
+    }
+    trayApp = app 'osampo-pc' {
+      description 'Dog in the tray and a small dog window sitting on the taskbar; notifications and sounds'
+      technology 'Rust, StatusNotifierItem, D-Bus'
+    }
+    settings = app 'osampo-reglages' {
+      description 'Settings app: needs, reminders, walks, sounds'
+      technology 'Rust, Slint'
+    }
+    simulator = app 'Desktop simulator' {
+      description 'The same puppy in a 240x284 window, for development and demos'
+      technology 'widgets/osampo/desktop, Slint'
+    }
+    linkS = component 'Socket link' {
+      description 'Unix socket client'
+      technology 'platform/link_socket'
+    }
+    config = store 'osampo.toml' {
+      description '~/.config/osampo/osampo.toml'
+    }
+    hook = component 'claude_wait.sh' {
+      description 'Claude Code hook: one file per waiting session'
+      technology 'POSIX sh'
+    }
+    simulator -> linkS 'uses'
+    settings -> config 'edits'
+  }
+
+  user -> board.firmware 'pets, throws, walks with'
+  user -> pc.trayApp 'sees the dog, answers reminders'
+  user -> pc.settings 'tunes'
+  claude -> pc.hook 'runs on each event'
+  pc.hook -> pc.daemon.sources 'waiting / not waiting' {
+    technology 'files under $XDG_RUNTIME_DIR/osampo'
+  }
+  pc.config -> pc.daemon 'read and watched'
+  pc.daemon.emitters -[ble]-> board.linkB 'state lines, config' {
+    technology 'Bluetooth LE'
+  }
+  pc.daemon.emitters -[usb]-> board.linkB 'same lines, when plugged in' {
+    technology 'USB serial'
+  }
+  board.linkB -[ble]-> pc.daemon.emitters 'events (walk, reminder answered)'
+  pc.daemon.emitters -[local]-> pc.trayApp 'state, events' {
+    technology 'Unix socket'
+  }
+  pc.daemon.emitters -[local]-> pc.linkS 'state lines' {
+    technology 'Unix socket'
+  }
+}
+
+views {
+  view index {
+    title 'Osampo: context'
+    include user, claude, board, pc
+    autoLayout LeftRight
+  }
+  view containers {
+    title 'Osampo: inside the board and the PC'
+    include user, claude, board.*, pc.*
+    autoLayout LeftRight
+  }
+  view daemon of pc.daemon {
+    title 'osampo-daemon'
+    include *, pc.hook, pc.config, board.linkB, pc.trayApp, pc.linkS
+    autoLayout LeftRight
+  }
+  dynamic view claudeWaits {
+    title 'Claude Code waits: the puppy asks for you'
+    claude -> pc.hook 'Notification / Stop hook'
+    pc.hook -> pc.daemon.sources 'writes 1'
+    pc.daemon.sources -> pc.daemon.emitters 'claude_wait=1'
+    pc.daemon.emitters -> board.linkB 'state line, by Bluetooth or USB'
+    board.linkB -> board.firmware 'claude_wait=1'
+    board.firmware -> user 'puppy sits and scratches the screen'
+    pc.daemon.emitters -> pc.trayApp 'claude_wait=1'
+    pc.trayApp -> user 'paw on the tray dog'
+  }
+}

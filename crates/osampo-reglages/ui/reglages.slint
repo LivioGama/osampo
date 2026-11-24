@@ -1,0 +1,723 @@
+// Fenetre de reglages de osampo.toml (SPEC-007, design 2026-11-22-reglages-ux) : 4 onglets
+// par usage, une ligne par champ, aide du champ qui a le focus dans un bandeau. Les valeurs, le
+// rangement et les messages viennent de src/gui.rs et src/pages.rs ; la validation est celle
+// du daemon.
+import { TabWidget, LineEdit, Button, ScrollView, ComboBox, CheckBox } from "std-widgets.slint";
+
+export struct Champ {
+    // Indice dans bornes::CLES, renvoye par `saisir`.
+    index: int,
+    nom: string,
+    libelle: string,
+    aide: string,
+    bornes: string,
+    bornes-longues: string,
+    // Sous-titre affiche avant ce champ ("" : aucun).
+    bloc: string,
+    // Champ HH:MM : "8:00" devient "08:00" quand on le quitte.
+    heure: bool,
+    valeur: string,
+}
+
+export struct PlageH {
+    libelle: string,
+    note: string,
+    debut: Champ,
+    fin: Champ,
+}
+
+export struct LigneRappel {
+    categorie: string,
+    heure: string,
+    jours: [bool],
+}
+
+export struct AideTexte {
+    titre: string,
+    texte: string,
+}
+
+// Mise en forme faite cote Rust (pages::heure_normalisee).
+export global Format {
+    pure callback heure(string) -> string;
+}
+
+// Champ texte avec un cadre rouge quand la valeur est refusee.
+component Saisie inherits Rectangle {
+    in property <string> valeur;
+    in property <string> indice;
+    in property <bool> faux;
+    // Champ HH:MM : complete "8:00" en "08:00" quand on le quitte.
+    in property <bool> heure;
+    callback edite(string);
+    callback a-le-focus();
+    callback quitte();
+    border-width: 2px;
+    border-radius: 4px;
+    border-color: root.faux ? #d32f2f : transparent;
+    VerticalLayout {
+        padding: 2px;
+        LineEdit {
+            // Sans cela le LineEdit fluent impose sa largeur minimale et deborde du cadre.
+            min-width: 40px;
+            text: root.valeur;
+            placeholder-text: root.indice;
+            edited(t) => {
+                root.edite(t);
+            }
+            changed has-focus => {
+                if self.has-focus {
+                    root.a-le-focus();
+                } else {
+                    if root.heure {
+                        let h = Format.heure(self.text);
+                        if h != self.text {
+                            self.text = h;
+                            root.edite(h);
+                        }
+                    }
+                    root.quitte();
+                }
+            }
+        }
+    }
+}
+
+component Erreur inherits Text {
+    color: #d32f2f;
+    wrap: word-wrap;
+    font-size: 12px;
+}
+
+component Bloc inherits Text {
+    font-weight: 700;
+}
+
+// Un champ sur une ligne : libelle, saisie, bornes courtes ; erreur dessous.
+component Ligne {
+    in property <Champ> c;
+    in property <string> erreur;
+    callback saisi(int, string);
+    callback focus-pris(Champ);
+
+    VerticalLayout {
+        spacing: 2px;
+        if root.c.bloc != "": VerticalLayout {
+            padding-top: 8px;
+            Bloc {
+                text: root.c.bloc;
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Text {
+                text: root.c.libelle;
+                width: 260px;
+                vertical-alignment: center;
+                wrap: word-wrap;
+            }
+
+            Saisie {
+                width: 150px;
+                heure: root.c.heure;
+                valeur: root.c.valeur;
+                faux: root.erreur != "";
+                edite(t) => {
+                    root.saisi(root.c.index, t);
+                }
+                a-le-focus => {
+                    root.focus-pris(root.c);
+                }
+            }
+
+            Text {
+                width: 180px;
+                text: root.c.bornes;
+                color: #666666;
+                font-size: 12px;
+                vertical-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.erreur != "": Erreur {
+            text: root.erreur;
+        }
+    }
+}
+
+// Plage horaire : `<libelle>  de [debut] a [fin]`, la regle debut = fin dessous.
+component LignePlage {
+    in property <PlageH> p;
+    in property <string> erreur-debut;
+    in property <string> erreur-fin;
+    callback saisi(int, string);
+    callback focus-pris(Champ);
+
+    VerticalLayout {
+        spacing: 2px;
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Text {
+                text: root.p.libelle;
+                width: 160px;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "de";
+                vertical-alignment: center;
+            }
+
+            Saisie {
+                width: 90px;
+                valeur: root.p.debut.valeur;
+                indice: "HH:MM";
+                heure: true;
+                faux: root.erreur-debut != "";
+                edite(t) => {
+                    root.saisi(root.p.debut.index, t);
+                }
+                a-le-focus => {
+                    root.focus-pris(root.p.debut);
+                }
+            }
+
+            Text {
+                text: "à";
+                vertical-alignment: center;
+            }
+
+            Saisie {
+                width: 90px;
+                valeur: root.p.fin.valeur;
+                indice: "HH:MM";
+                heure: true;
+                faux: root.erreur-fin != "";
+                edite(t) => {
+                    root.saisi(root.p.fin.index, t);
+                }
+                a-le-focus => {
+                    root.focus-pris(root.p.fin);
+                }
+            }
+        }
+
+        Text {
+            text: root.p.note;
+            color: #666666;
+            font-size: 12px;
+        }
+
+        if root.erreur-debut != "": Erreur {
+            text: root.erreur-debut;
+        }
+        if root.erreur-fin != "": Erreur {
+            text: root.erreur-fin;
+        }
+    }
+}
+
+export component Reglages inherits Window {
+    title: "Réglages du chiot";
+    preferred-width: 880px;
+    preferred-height: 640px;
+    min-width: 640px;
+
+    // Fichier illisible : seul ce message est affiche, aucun champ editable.
+    in property <string> erreur-lecture;
+    in property <string> chemin;
+
+    // Champs par onglet, assignes une seule fois a l'ouverture (la frappe ne les recree pas).
+    in property <[Champ]> champs-rappels;
+    in property <[PlageH]> plages;
+    in property <[Champ]> champs-horaires;
+    in property <[Champ]> champs-promenade;
+    in property <[Champ]> champs-board;
+    in property <[LigneRappel]> rappels;
+
+    // Erreurs, dans l'ordre des listes ci-dessus ; erreurs-plages : debut puis fin de chaque plage.
+    in property <[string]> erreurs-rappels-fins;
+    in property <[string]> erreurs-plages;
+    in property <[string]> erreurs-horaires;
+    in property <[string]> erreurs-promenade;
+    in property <[string]> erreurs-board;
+    in property <[string]> erreurs-rappels;
+    in property <bool> fins-en-erreur;
+    in property <[bool]> pages-en-erreur: [false, false, false, false];
+    in property <string> erreur-globale;
+    in property <string> statut;
+    in property <bool> enregistrable;
+
+    // Aides des trois colonnes d'un rappel (SPEC-010).
+    in property <AideTexte> aide-categorie;
+    in property <AideTexte> aide-heure;
+    in property <AideTexte> aide-jours;
+
+    // Cadre `Jauge sage` (SPEC-009) : valeur courante, etat du daemon, erreur de la derniere action.
+    in property <string> jauge-texte;
+    in property <bool> jauge-joignable;
+    in property <string> jauge-erreur;
+    in-out property <bool> jauge-champ-valide;
+    in-out property <bool> jauge-champ-marque;
+
+    callback remplir-jauge();
+    callback vider-jauge();
+    callback fixer-jauge(string);
+    callback saisir-jauge(string);
+    callback saisir(int, string);
+    callback saisir-rappel(int, int, string);
+    callback basculer-jour(int, int, bool);
+    callback ajouter-rappel();
+    // Le champ heure d'un rappel quitte : la liste se range par heure.
+    callback ranger-rappels();
+    callback supprimer-rappel(int);
+    callback enregistrer();
+    // Bouton « Valeurs par défaut… », après confirmation.
+    callback valeurs-par-defaut();
+    callback fermer();
+
+    property <[string]> lettres: ["L", "M", "M", "J", "V", "S", "D"];
+    property <bool> fins-ouverts;
+    property <bool> confirmer-defaut;
+    property <string> aide-titre;
+    property <string> aide-cle;
+    property <string> aide-texte: "Cliquez un champ pour voir son explication.";
+
+    changed fins-en-erreur => {
+        if self.fins-en-erreur {
+            self.fins-ouverts = true;
+        }
+    }
+
+    function montrer(titre: string, cle: string, texte: string) {
+        self.aide-titre = titre;
+        self.aide-cle = cle;
+        self.aide-texte = texte;
+    }
+
+    function montrer-champ(c: Champ) {
+        self.montrer(c.libelle, c.nom, c.aide + "\nValeurs : " + c.bornes-longues);
+    }
+
+    function montrer-rappel(a: AideTexte) {
+        self.montrer(a.titre, "[[rappel]]", a.texte);
+    }
+
+    if root.erreur-lecture != "": VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+        Text {
+            text: "Le fichier de réglages ne peut pas être lu";
+            font-weight: 700;
+        }
+
+        Text {
+            text: root.erreur-lecture;
+            color: #d32f2f;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: "Rien n'est écrit. Corrigez le fichier " + root.chemin + " puis relancez.";
+            wrap: word-wrap;
+        }
+
+        Rectangle { }
+
+        HorizontalLayout {
+            alignment: end;
+            Button {
+                text: "Fermer";
+                clicked => {
+                    root.fermer();
+                }
+            }
+        }
+    }
+
+    if root.erreur-lecture == "": VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        TabWidget {
+            Tab {
+                title: "Rappels" + (root.pages-en-erreur[0] ? " •" : "");
+                ScrollView {
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 6px;
+                        alignment: start;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Bloc {
+                                text: "Sorte";
+                                width: 110px;
+                            }
+
+                            Bloc {
+                                text: "Heure";
+                                width: 80px;
+                            }
+
+                            Bloc {
+                                text: "Jours";
+                                horizontal-stretch: 1;
+                            }
+                        }
+
+                        for r[n] in root.rappels: VerticalLayout {
+                            spacing: 2px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                ComboBox {
+                                    model: ["repas", "sortie", "sport", "dodo"];
+                                    current-value: r.categorie;
+                                    width: 110px;
+                                    selected(v) => {
+                                        root.saisir-rappel(n, 0, v);
+                                    }
+                                    changed has-focus => {
+                                        if self.has-focus {
+                                            root.montrer-rappel(root.aide-categorie);
+                                        }
+                                    }
+                                }
+
+                                Saisie {
+                                    width: 80px;
+                                    valeur: r.heure;
+                                    indice: "HH:MM";
+                                    heure: true;
+                                    faux: root.erreurs-rappels[n] != "";
+                                    edite(t) => {
+                                        root.saisir-rappel(n, 1, t);
+                                    }
+                                    a-le-focus => {
+                                        root.montrer-rappel(root.aide-heure);
+                                    }
+                                    quitte => {
+                                        root.ranger-rappels();
+                                    }
+                                }
+
+                                for j[k] in r.jours: CheckBox {
+                                    text: root.lettres[k];
+                                    checked: j;
+                                    toggled => {
+                                        root.basculer-jour(n, k, self.checked);
+                                    }
+                                    changed has-focus => {
+                                        if self.has-focus {
+                                            root.montrer-rappel(root.aide-jours);
+                                        }
+                                    }
+                                }
+
+                                Button {
+                                    text: "✕";
+                                    enabled: root.rappels.length > 1;
+                                    clicked => {
+                                        root.supprimer-rappel(n);
+                                    }
+                                }
+                            }
+
+                            if root.erreurs-rappels[n] != "": Erreur {
+                                text: root.erreurs-rappels[n];
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: start;
+                            Button {
+                                text: "+ Ajouter un rappel";
+                                enabled: root.rappels.length < 16;
+                                clicked => {
+                                    root.ajouter-rappel();
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            padding-top: 12px;
+                            HorizontalLayout {
+                                alignment: start;
+                                Bloc {
+                                    text: (root.fins-ouverts ? "▾ " : "▸ ") + "Réglages fins des rappels" + (root.fins-en-erreur ? " •" : "");
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.fins-ouverts = !root.fins-ouverts;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.fins-ouverts: VerticalLayout {
+                            spacing: 8px;
+                            for c[i] in root.champs-rappels: Ligne {
+                                c: c;
+                                erreur: root.erreurs-rappels-fins[i];
+                                saisi(x, t) => {
+                                    root.saisir(x, t);
+                                }
+                                focus-pris(c) => {
+                                    root.montrer-champ(c);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Tab {
+                title: "Promenade" + (root.pages-en-erreur[1] ? " •" : "");
+                ScrollView {
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 8px;
+                        alignment: start;
+                        Rectangle {
+                            border-width: 1px;
+                            border-radius: 4px;
+                            border-color: #888888;
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 6px;
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    alignment: start;
+                                    Bloc {
+                                        text: "Jauge sage";
+                                    }
+
+                                    Text {
+                                        text: root.jauge-texte;
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    Button {
+                                        text: "Remplir";
+                                        enabled: root.jauge-joignable;
+                                        clicked => {
+                                            root.remplir-jauge();
+                                        }
+                                    }
+
+                                    Button {
+                                        text: "Vider";
+                                        enabled: root.jauge-joignable;
+                                        clicked => {
+                                            root.vider-jauge();
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 90px;
+                                        border-width: 2px;
+                                        border-radius: 4px;
+                                        border-color: root.jauge-champ-marque ? #d32f2f : transparent;
+                                        VerticalLayout {
+                                            padding: 2px;
+                                            champ-jauge := LineEdit {
+                                                min-width: 40px;
+                                                placeholder-text: "0 à 100";
+                                                enabled: root.jauge-joignable;
+                                                edited(t) => {
+                                                    root.saisir-jauge(t);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Button {
+                                        text: "Fixer";
+                                        enabled: root.jauge-joignable && root.jauge-champ-valide;
+                                        clicked => {
+                                            root.fixer-jauge(champ-jauge.text);
+                                        }
+                                    }
+
+                                    if root.jauge-champ-marque: Erreur {
+                                        text: "valeur hors de 0..100";
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                if root.jauge-erreur != "": Erreur {
+                                    text: root.jauge-erreur;
+                                }
+                            }
+                        }
+
+                        for c[i] in root.champs-promenade: Ligne {
+                            c: c;
+                            erreur: root.erreurs-promenade[i];
+                            saisi(x, t) => {
+                                root.saisir(x, t);
+                            }
+                            focus-pris(c) => {
+                                root.montrer-champ(c);
+                            }
+                        }
+                    }
+                }
+            }
+
+            Tab {
+                title: "Horaires" + (root.pages-en-erreur[2] ? " •" : "");
+                ScrollView {
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 14px;
+                        alignment: start;
+                        for p[i] in root.plages: LignePlage {
+                            p: p;
+                            erreur-debut: root.erreurs-plages[2 * i];
+                            erreur-fin: root.erreurs-plages[2 * i + 1];
+                            saisi(x, t) => {
+                                root.saisir(x, t);
+                            }
+                            focus-pris(c) => {
+                                root.montrer-champ(c);
+                            }
+                        }
+                        for c[i] in root.champs-horaires: Ligne {
+                            c: c;
+                            erreur: root.erreurs-horaires[i];
+                            saisi(x, t) => {
+                                root.saisir(x, t);
+                            }
+                            focus-pris(c) => {
+                                root.montrer-champ(c);
+                            }
+                        }
+                    }
+                }
+            }
+
+            Tab {
+                title: "Board" + (root.pages-en-erreur[3] ? " •" : "");
+                ScrollView {
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 8px;
+                        alignment: start;
+                        for c[i] in root.champs-board: Ligne {
+                            c: c;
+                            erreur: root.erreurs-board[i];
+                            saisi(x, t) => {
+                                root.saisir(x, t);
+                            }
+                            focus-pris(c) => {
+                                root.montrer-champ(c);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.erreur-globale != "": Erreur {
+            text: root.erreur-globale;
+        }
+
+        // Bandeau d'aide du champ qui a le focus.
+        Rectangle {
+            height: 90px;
+            background: #f2f2f2;
+            border-radius: 4px;
+            VerticalLayout {
+                padding: 8px;
+                spacing: 2px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Bloc {
+                        text: root.aide-titre;
+                    }
+
+                    Text {
+                        text: root.aide-cle;
+                        color: #888888;
+                        font-size: 11px;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: root.aide-texte;
+                    font-size: 12px;
+                    color: #444444;
+                    wrap: word-wrap;
+                    vertical-stretch: 1;
+                }
+            }
+        }
+
+        if root.confirmer-defaut: HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: "Remettre tous les réglages et les rappels aux valeurs par défaut ? Rien n'est écrit avant « Enregistrer ».";
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                wrap: word-wrap;
+                font-weight: 700;
+            }
+
+            Button {
+                text: "Remettre";
+                clicked => {
+                    root.confirmer-defaut = false;
+                    root.valeurs-par-defaut();
+                }
+            }
+
+            Button {
+                text: "Annuler";
+                clicked => {
+                    root.confirmer-defaut = false;
+                }
+            }
+        }
+
+        if !root.confirmer-defaut: HorizontalLayout {
+            spacing: 8px;
+            Button {
+                text: "Valeurs par défaut…";
+                clicked => {
+                    root.confirmer-defaut = true;
+                }
+            }
+
+            Text {
+                text: root.statut;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+                wrap: word-wrap;
+            }
+
+            Button {
+                text: "Enregistrer";
+                enabled: root.enregistrable;
+                clicked => {
+                    root.enregistrer();
+                }
+            }
+
+            Button {
+                text: "Fermer";
+                clicked => {
+                    root.fermer();
+                }
+            }
+        }
+    }
+}

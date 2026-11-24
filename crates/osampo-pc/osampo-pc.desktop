@@ -1,0 +1,13 @@
+[Desktop Entry]
+# Demarrage de osampo-pc avec la session graphique (SPEC-004).
+# Installation :
+#   mkdir -p ~/.config/autostart
+#   cp crates/osampo-pc/osampo-pc.desktop ~/.config/autostart/
+# Pose par installer/linux/installer.sh. A la main : remplacer UTILISATEUR
+# dans Exec (Exec n'expanse ni ~ ni $HOME : chemin absolu).
+Type=Application
+Name=Osampo
+Comment=Icone du chiot dans la zone de notification
+Exec=/home/UTILISATEUR/.local/bin/osampo-pc
+Terminal=false
+X-GNOME-Autostart-enabled=true

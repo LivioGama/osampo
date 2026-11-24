@@ -1,0 +1,15 @@
+export global Theme {
+    // bulle de rappel au-dessus du chiot
+    out property <color> bubble-bg: #fdfdf6;
+    out property <color> bubble-border: #3a2a1a;
+    out property <color> bubble-fg: #3a2a1a;
+    // horloge digitale en haut a gauche (SP5e), lisible sur les fonds jour et nuit
+    out property <color> clock-bg: #00000080;
+    out property <color> clock-fg: #ffffff;
+
+    // Duree d une case d animation (choix Claude, spec : durees libres).
+    out property <duration> frame: 150ms;
+    // Gestes (brief Task 7)
+    out property <length> stroke-min: 40px;
+    out property <duration> long-press: 800ms;
+}

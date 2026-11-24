@@ -1,0 +1,6 @@
+dependencies:
+  idf:
+    version: ">=5.5.0"
+  slint/slint: "1.18.*"
+  espressif/esp_lcd_touch: "^1"
+  espressif/esp_lcd_touch_cst816s: "^1"

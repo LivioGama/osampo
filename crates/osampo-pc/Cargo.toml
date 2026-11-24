@@ -1,0 +1,16 @@
+[package]
+name = "osampo-pc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+osampo-config = { path = "../osampo-config" }
+# zbus et ksni sur async-io (defaut de zbus) : slint tire deja ksni avec async-io dans le
+# workspace, et ksni refuse d'avoir "tokio" et "async-io" en meme temps.
+zbus = "5"
+ksni = { version = "0.3", default-features = false, features = ["async-io"] }
+x11rb = { version = "0.14", features = ["xinput", "xfixes", "shape", "randr"] }
+png = "0.18"
+futures-util = "0.3"
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "io-util", "process"] }

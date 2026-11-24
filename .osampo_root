@@ -1,0 +1,3 @@
+Ce fichier marque la racine du depot. Les CMakeLists des widgets remontent
+jusqu a lui pour trouver platform/ et cmake/, parce que le widget peut etre
+deplace dans l arborescence.

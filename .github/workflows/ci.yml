@@ -1,0 +1,26 @@
+# Suite complete (tests/run_all.sh) sur Ubuntu : Rust, C++ (logique de la board et
+# simulateur desktop), installeur, verification de publication, acceptance (Xvfb, D-Bus).
+# Le firmware ESP-IDF n'est pas compile ici.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paquets systeme
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config libdbus-1-dev libfontconfig-dev libxkbcommon-dev \
+            xvfb dbus python3-pytest python3-dbus python3-gi python3-pil python3-xlib
+      - name: Rust stable
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Suite complete
+        # python3 du systeme : les modules dbus, gi et Xlib viennent d'apt
+        run: PATH="/usr/bin:$PATH" tests/run_all.sh

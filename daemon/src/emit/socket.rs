@@ -500,9 +500,8 @@ mod tests {
     }
 
     /// Un repertoire de widgets avec demo3 et osampo, pour servir_un_client en direct.
-    fn widgets(nom: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("sp3_socket_unit_{nom}_{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
+    fn widgets(nom: &str) -> osampo_config::essai::DossierTemp {
+        let d = osampo_config::essai::DossierTemp::new(&format!("socket_unit_{nom}"));
         for id in ["demo3", "osampo"] {
             std::fs::create_dir_all(d.join(id)).unwrap();
             std::fs::write(
@@ -534,7 +533,8 @@ mod tests {
         // une relecture avant la connexion : le client recoit la ligne courante, une fois
         cfg_tx.send_replace(Some("{\"cfg\":1,\"lum_nuit\":25}".to_string()));
         let (serveur, mut client) = UnixStream::pair().unwrap();
-        let tache = tokio::spawn(servir_un_client(serveur, widgets("cfg"), rx, cfg_rx, None));
+        let dir = widgets("cfg");
+        let tache = tokio::spawn(servir_un_client(serveur, dir.to_path_buf(), rx, cfg_rx, None));
 
         client.write_all(b"{\"hello\":\"osampo\"}\n").await.unwrap();
         let mut lecteur = BufReader::new(&mut client);
@@ -591,7 +591,8 @@ mod tests {
         let (tx, rx) = broadcast::channel::<Frame>(16);
         let (cfg_tx, cfg_rx) = watch::channel(Some("{\"cfg\":1,\"lum_nuit\":20}".to_string()));
         let (serveur, mut client) = UnixStream::pair().unwrap();
-        let tache = tokio::spawn(servir_un_client(serveur, widgets("autre"), rx, cfg_rx, None));
+        let dir = widgets("autre");
+        let tache = tokio::spawn(servir_un_client(serveur, dir.to_path_buf(), rx, cfg_rx, None));
 
         client.write_all(b"{\"hello\":\"demo3\"}\n").await.unwrap();
         let mut lecteur = BufReader::new(&mut client);
@@ -615,7 +616,8 @@ mod tests {
         // sera ecrit, donc seule la lecture peut voir le depart du client.
         let (tx, rx) = broadcast::channel::<Frame>(16);
         let (serveur, mut client) = UnixStream::pair().unwrap();
-        let tache = tokio::spawn(servir_un_client(serveur, widgets("parti"), rx, sans_cfg(), None));
+        let dir = widgets("parti");
+        let tache = tokio::spawn(servir_un_client(serveur, dir.to_path_buf(), rx, sans_cfg(), None));
 
         client.write_all(b"{\"hello\":\"demo3\"}\n").await.unwrap();
         let mut ack = String::new();
@@ -638,7 +640,8 @@ mod tests {
     async fn un_client_muet_est_ferme_apres_le_delai_du_hello() {
         let (_tx, rx) = broadcast::channel::<Frame>(16);
         let (serveur, client) = UnixStream::pair().unwrap();
-        let tache = tokio::spawn(servir_un_client(serveur, widgets("muet"), rx, sans_cfg(), None));
+        let dir = widgets("muet");
+        let tache = tokio::spawn(servir_un_client(serveur, dir.to_path_buf(), rx, sans_cfg(), None));
 
         let fin = tokio::time::timeout(DELAI_HELLO + Duration::from_secs(1), tache)
             .await

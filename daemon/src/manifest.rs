@@ -80,11 +80,8 @@ mod tests {
         f.write_all(contenu.as_bytes()).unwrap();
     }
 
-    fn racine_temporaire(nom: &str) -> std::path::PathBuf {
-        let d = std::env::temp_dir().join(format!("sp3_manifest_{nom}"));
-        let _ = std::fs::remove_dir_all(&d);
-        std::fs::create_dir_all(&d).unwrap();
-        d
+    fn racine_temporaire(nom: &str) -> osampo_config::essai::DossierTemp {
+        osampo_config::essai::DossierTemp::new(&format!("manifest_{nom}"))
     }
 
     #[test]

@@ -12,12 +12,16 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+use osampo_config::essai::DossierTemp;
+
 /// Delai de lecture applique a tout flux de test.
 const DELAI_LECTURE: Duration = Duration::from_secs(3);
 
 struct Daemon {
     child: Child,
     socket: PathBuf,
+    /// Dossier du test, efface apres l arret du daemon (Drop ci-dessous, puis les champs).
+    _base: Option<DossierTemp>,
 }
 
 impl Drop for Daemon {
@@ -41,13 +45,14 @@ fn ecrire_manifeste(racine: &Path, id: &str, cles: &str) {
 
 const CLES_DEMO3: &str = "[[keys]]\nname = \"value\"\ntype = \"float\"\n\n[[keys]]\nname = \"label\"\ntype = \"string\"\n\n[[keys]]\nname = \"state\"\ntype = \"string\"\n";
 
-/// Repertoire de test vide, rendu avec le chemin du socket et la racine des widgets.
-fn preparer(nom: &str) -> (PathBuf, PathBuf) {
-    let base = std::env::temp_dir().join(format!("sp3_socket_{nom}"));
-    let _ = std::fs::remove_dir_all(&base);
+/// Repertoire de test vide (efface au Drop du premier element), la racine des widgets et
+/// le chemin du socket.
+fn preparer(nom: &str) -> (DossierTemp, PathBuf, PathBuf) {
+    let base = DossierTemp::new(&format!("socket_{nom}"));
     let racine = base.join("widgets");
     std::fs::create_dir_all(&racine).unwrap();
-    (racine, base.join("d.sock"))
+    let socket = base.join("d.sock");
+    (base, racine, socket)
 }
 
 /// Lance le daemon et attend qu il accepte une connexion. Attendre la seule
@@ -65,7 +70,7 @@ fn lancer_avec(racine: &Path, socket: &Path, extra: &[&Path]) -> Daemon {
     let child = cmd
         .spawn()
         .expect("le binaire daemon doit se lancer");
-    let mut d = Daemon { child, socket: socket.to_path_buf() };
+    let mut d = Daemon { child, socket: socket.to_path_buf(), _base: None };
 
     let limite = Instant::now() + Duration::from_secs(10);
     while UnixStream::connect(socket).is_err() {
@@ -79,11 +84,13 @@ fn lancer_avec(racine: &Path, socket: &Path, extra: &[&Path]) -> Daemon {
 }
 
 fn demarrer(nom: &str) -> Daemon {
-    let (racine, socket) = preparer(nom);
+    let (base, racine, socket) = preparer(nom);
     ecrire_manifeste(&racine, "demo3", CLES_DEMO3);
     // un second widget qui ne declare qu une cle : sert au test de filtrage
     ecrire_manifeste(&racine, "maigre", "[[keys]]\nname = \"value\"\ntype = \"float\"\n");
-    lancer(&racine, &socket)
+    let mut d = lancer(&racine, &socket);
+    d._base = Some(base);
+    d
 }
 
 fn ouvrir(d: &Daemon, hello: &[u8]) -> UnixStream {
@@ -245,7 +252,7 @@ fn demarre_malgre_un_socket_residuel() {
     // Un daemon qui a plante laisse son fichier socket en place. bind
     // echouerait en EADDRINUSE : le daemon doit constater que plus personne
     // n ecoute, supprimer le fichier, et repartir.
-    let (racine, socket) = preparer("residuel");
+    let (_base, racine, socket) = preparer("residuel");
     ecrire_manifeste(&racine, "demo3", CLES_DEMO3);
     drop(std::os::unix::net::UnixListener::bind(&socket).unwrap());
     assert!(socket.exists(), "le socket residuel doit exister avant le test");
@@ -293,7 +300,7 @@ fn le_socket_disparait_sur_sigterm() {
 fn le_controle_croise_porte_sur_tous_les_manifestes() {
     // Le widget fautif est le dernier par ordre alphabetique : un controle
     // limite au widget de cadence ne le verrait pas.
-    let (racine, socket) = preparer("croise");
+    let (_base, racine, socket) = preparer("croise");
     ecrire_manifeste(&racine, "demo3", CLES_DEMO3);
     ecrire_manifeste(&racine, "zz_orphelin", "[[keys]]\nname = \"absente\"\ntype = \"float\"\n");
     let child = Command::new(env!("CARGO_BIN_EXE_osampo-daemon"))
@@ -303,7 +310,7 @@ fn le_controle_croise_porte_sur_tous_les_manifestes() {
         .arg(&socket)
         .spawn()
         .unwrap();
-    let mut d = Daemon { child, socket };
+    let mut d = Daemon { child, socket, _base: None };
     let fin = attendre_la_fin(&mut d, Duration::from_secs(10))
         .expect("le daemon doit refuser de demarrer");
     assert!(!fin.success(), "une cle que personne ne produit doit bloquer le demarrage");
@@ -315,7 +322,7 @@ fn une_cle_absente_du_manifeste_de_cadence_bloque_le_demarrage() {
     // value ; le second declare aussi label, que la source produit bien. Le
     // planificateur ne connait que les cles du premier : label ne serait
     // jamais emise. Le daemon doit le dire et refuser de demarrer.
-    let (racine, socket) = preparer("hors_cadence");
+    let (_base, racine, socket) = preparer("hors_cadence");
     ecrire_manifeste(&racine, "aa_cadence", "[[keys]]\nname = \"value\"\ntype = \"float\"\n");
     ecrire_manifeste(
         &racine,
@@ -330,7 +337,7 @@ fn une_cle_absente_du_manifeste_de_cadence_bloque_le_demarrage() {
         .stderr(std::process::Stdio::piped())
         .spawn()
         .unwrap();
-    let mut d = Daemon { child, socket };
+    let mut d = Daemon { child, socket, _base: None };
     let fin = attendre_la_fin(&mut d, Duration::from_secs(10))
         .expect("le daemon doit refuser de demarrer");
     assert!(!fin.success(), "une cle absente du manifeste de cadence doit bloquer le demarrage");
@@ -347,7 +354,7 @@ fn le_mode_d_un_repertoire_existant_n_est_pas_touche() {
     use std::os::unix::fs::PermissionsExt;
     // --socket dans un repertoire qui n est pas celui du repli : le daemon ne
     // doit pas en changer le mode (sinon $HOME passerait en 0700).
-    let (racine, socket) = preparer("mode");
+    let (_base, racine, socket) = preparer("mode");
     ecrire_manifeste(&racine, "demo3", CLES_DEMO3);
     let base = socket.parent().unwrap().to_path_buf();
     std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -360,7 +367,7 @@ fn le_mode_d_un_repertoire_existant_n_est_pas_touche() {
 
 #[test]
 fn un_fichier_ordinaire_sur_le_chemin_n_est_pas_efface() {
-    let (racine, socket) = preparer("ordinaire");
+    let (_base, racine, socket) = preparer("ordinaire");
     ecrire_manifeste(&racine, "demo3", CLES_DEMO3);
     std::fs::write(&socket, b"precieux").unwrap();
 
@@ -372,7 +379,7 @@ fn un_fichier_ordinaire_sur_le_chemin_n_est_pas_efface() {
         .stderr(std::process::Stdio::piped())
         .spawn()
         .unwrap();
-    let mut d = Daemon { child, socket: socket.clone() };
+    let mut d = Daemon { child, socket: socket.clone(), _base: None };
     let fin = attendre_la_fin(&mut d, Duration::from_secs(10))
         .expect("le daemon doit refuser de demarrer");
     let mut journal = String::new();
@@ -387,10 +394,11 @@ fn un_fichier_ordinaire_sur_le_chemin_n_est_pas_efface() {
 
 /// Daemon avec une board simulee (`--faux-ble`) ; rend aussi le chemin de celle-ci.
 fn demarrer_faux_ble(nom: &str) -> (Daemon, PathBuf) {
-    let (racine, socket) = preparer(nom);
+    let (base, racine, socket) = preparer(nom);
     ecrire_manifeste(&racine, "demo3", CLES_DEMO3);
     let faux = socket.with_file_name("b.sock");
-    let d = lancer_avec(&racine, &socket, &[faux.as_path()]);
+    let mut d = lancer_avec(&racine, &socket, &[faux.as_path()]);
+    d._base = Some(base);
     // Ne PAS sonder par une connexion : la board simulee n accepte qu un client a la fois et
     // prendrait la sonde pour la board. Pendant qu elle detecte la fermeture de la sonde, elle
     // refuse (ferme) la vraie connexion du test. bind cree le fichier et met a l ecoute d un
@@ -605,7 +613,7 @@ fn l_etat_est_repete_au_moins_toutes_les_10_secondes() {
 
 #[test]
 fn ble_et_faux_ble_s_excluent() {
-    let (racine, socket) = preparer("exclusifs");
+    let (_base, racine, socket) = preparer("exclusifs");
     ecrire_manifeste(&racine, "demo3", CLES_DEMO3);
     let statut = Command::new(env!("CARGO_BIN_EXE_osampo-daemon"))
         .arg("--widgets-dir")

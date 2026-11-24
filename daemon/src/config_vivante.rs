@@ -135,13 +135,12 @@ pub fn surveiller(
 mod tests {
     use super::*;
 
-    fn fichier(nom: &str, texte: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("sp5c_vivante_{}_{nom}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        std::fs::create_dir_all(&d).unwrap();
+    /// Le fichier de reglages, dans un dossier efface quand le premier element est lache.
+    fn fichier(nom: &str, texte: &str) -> (osampo_config::essai::DossierTemp, PathBuf) {
+        let d = osampo_config::essai::DossierTemp::new(&format!("vivante_{nom}"));
         let f = d.join("osampo.toml");
         std::fs::write(&f, texte).unwrap();
-        f
+        (d, f)
     }
 
     type Canaux = (
@@ -161,7 +160,7 @@ mod tests {
 
     #[test]
     fn relecture_acceptee_publie_cfg() {
-        let f = fichier("acceptee", "[ecran]\nlum_nuit = 20\n");
+        let (_d, f) = fichier("acceptee", "[ecran]\nlum_nuit = 20\n");
         let mut s = Surveillant::new(f.clone());
         let (rt, mut rr, ct, mut cr) = canaux(config::lire("[ecran]\nlum_nuit = 20\n").unwrap());
         rr.borrow_and_update();
@@ -185,7 +184,7 @@ mod tests {
     #[test]
     fn relecture_daemon_seule_ne_renvoie_pas_cfg() {
         // vide_apres_min ne part pas sur le fil : la ligne cfg ne change pas
-        let f = fichier("poste", "");
+        let (_d, f) = fichier("poste", "");
         let mut s = Surveillant::new(f.clone());
         let (rt, mut rr, ct, mut cr) = canaux(Reglages::default());
         cr.borrow_and_update();
@@ -197,7 +196,7 @@ mod tests {
 
     #[test]
     fn relecture_fautive_garde_l_ancien() {
-        let f = fichier("fautive", "[ecran]\nlum_nuit = 30\n");
+        let (_d, f) = fichier("fautive", "[ecran]\nlum_nuit = 30\n");
         let mut s = Surveillant::new(f.clone());
         let initiaux = config::lire("[ecran]\nlum_nuit = 30\n").unwrap();
         let (rt, mut rr, ct, mut cr) = canaux(initiaux.clone());
@@ -225,7 +224,7 @@ mod tests {
     fn fichier_vide_ignore_le_temps_de_l_ecriture() {
         // Un editeur qui ecrit sur place tronque d abord le fichier : le
         // regard qui tombe entre les deux ne doit pas envoyer les defauts.
-        let f = fichier("vide", "[ecran]\nlum_nuit = 30\n");
+        let (_d, f) = fichier("vide", "[ecran]\nlum_nuit = 30\n");
         let mut s = Surveillant::new(f.clone());
         let initiaux = config::lire("[ecran]\nlum_nuit = 30\n").unwrap();
         let (rt, mut rr, ct, mut cr) = canaux(initiaux.clone());
@@ -249,7 +248,7 @@ mod tests {
 
     #[test]
     fn fichier_supprime_garde_les_reglages_sans_le_recreer() {
-        let f = fichier("supprime", "[ecran]\nlum_nuit = 30\n");
+        let (_d, f) = fichier("supprime", "[ecran]\nlum_nuit = 30\n");
         let mut s = Surveillant::new(f.clone());
         let initiaux = config::lire("[ecran]\nlum_nuit = 30\n").unwrap();
         let (rt, rr, ct, mut cr) = canaux(initiaux.clone());

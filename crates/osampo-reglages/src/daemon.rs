@@ -166,10 +166,12 @@ mod tests {
         assert_eq!(texte_etat(None), "Daemon : injoignable");
     }
 
-    fn faux_daemon(nom: &str, reponse: &'static str) -> (PathBuf, std::thread::JoinHandle<String>) {
-        let d = std::env::temp_dir().join(format!("osampo-daemon-{}-{nom}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        std::fs::create_dir_all(&d).unwrap();
+    /// Le dossier (efface quand il est lache), le socket et le fil du faux daemon.
+    fn faux_daemon(
+        nom: &str,
+        reponse: &'static str,
+    ) -> (osampo_config::essai::DossierTemp, PathBuf, std::thread::JoinHandle<String>) {
+        let d = osampo_config::essai::DossierTemp::new(&format!("faux_daemon_{nom}"));
         let p = d.join("s.sock");
         let l = UnixListener::bind(&p).unwrap();
         let h = std::thread::spawn(move || {
@@ -183,12 +185,12 @@ mod tests {
             s.write_all([reponse, "\n"].concat().as_bytes()).unwrap();
             [hello, cmd].concat()
         });
-        (p, h)
+        (d, p, h)
     }
 
     #[test]
     fn envoi_ok_saute_les_lignes_d_etat() {
-        let (p, h) = faux_daemon("ok", r#"{"reponse":"jauge","ok":true}"#);
+        let (_d, p, h) = faux_daemon("ok", r#"{"reponse":"jauge","ok":true}"#);
         assert_eq!(envoyer_jauge(&p, 42), Ok(()));
         let recu = h.join().unwrap();
         assert_eq!(recu, "{\"hello\":\"osampo-pc\"}\n{\"cmd\":\"jauge\",\"valeur\":42}\n");
@@ -196,7 +198,7 @@ mod tests {
 
     #[test]
     fn envoi_erreur_du_daemon_et_injoignable() {
-        let (p, h) = faux_daemon("err", r#"{"reponse":"jauge","ok":false,"erreur":"jauge indisponible"}"#);
+        let (_d, p, h) = faux_daemon("err", r#"{"reponse":"jauge","ok":false,"erreur":"jauge indisponible"}"#);
         assert_eq!(envoyer_jauge(&p, 1), Err(ErreurJauge::Daemon("jauge indisponible".into())));
         h.join().unwrap();
         let absent = Path::new("/tmp/absent-osampo.sock");

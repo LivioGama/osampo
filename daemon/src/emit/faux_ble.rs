@@ -112,6 +112,7 @@ mod tests {
 
     struct Banc {
         chemin: PathBuf,
+        _dossier: osampo_config::essai::DossierTemp,
         tx: broadcast::Sender<Frame>,
         lien: LienBoard,
         _cfg: watch::Sender<Option<String>>,
@@ -119,12 +120,13 @@ mod tests {
     }
 
     fn demarrer(nom: &str) -> Banc {
-        let chemin = std::env::temp_dir().join(format!("faux_ble_{nom}_{}.sock", std::process::id()));
+        let dossier = osampo_config::essai::DossierTemp::new(&format!("faux_ble_{nom}"));
+        let chemin = dossier.join("b.sock");
         let (tx, rx) = broadcast::channel(8);
         let (cfg_tx, cfg) = watch::channel(Some("{\"cfg\":1}".to_string()));
         let (lien, cote) = creer();
         let tache = tokio::spawn(servir(chemin.clone(), rx, cfg, cote));
-        Banc { chemin, tx, lien, _cfg: cfg_tx, tache }
+        Banc { chemin, _dossier: dossier, tx, lien, _cfg: cfg_tx, tache }
     }
 
     async fn connecter(chemin: &PathBuf) -> UnixStream {

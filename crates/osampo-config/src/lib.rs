@@ -2,6 +2,7 @@
 //! Tout ou rien : un fichier invalide est refuse en entier, l erreur nomme la cle.
 
 pub mod bornes;
+pub mod essai;
 
 use serde::Deserialize;
 use std::path::{Path, PathBuf};

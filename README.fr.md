@@ -2,6 +2,19 @@
 
 *[English version](README.md)*
 
+## Pourquoi ?
+
+Avec un agent de code, une session ne s'arrête jamais d'elle-même : il y a toujours une tâche
+qui tourne, une question en attente, et « encore cinq minutes, il a bientôt fini ». J'ai
+construit Osampo pour deux choses :
+
+1. **Faire des pauses.** Le chiot s'impatiente quand je reste assis trop longtemps et réclame
+   sa promenade aux heures prévues. Accepter, c'est se lever : la board part avec moi et
+   compte mes pas.
+2. **Respecter l'heure du coucher.** Ne plus me coucher à 2 h du matin « parce que Claude a
+   bientôt fini ». Le soir, le chiot réclame sa dernière sortie, puis il va dormir, et l'écran
+   passe en mode nuit.
+
 **Osampo** (お散歩, *la promenade*) est un chiot en pixel art qui vit sur un petit écran ESP32
 à côté de ton clavier. Il s'ennuie, s'endort et s'agite quand tu restes trop longtemps assis,
 te réclame sa promenade, et pose la patte contre l'écran quand **Claude Code** t'attend.
@@ -19,8 +32,7 @@ le même chien est posé sur ta barre des tâches.
 
 ## L'idée
 
-De longues sessions devant l'ordinateur, seul ou avec un agent de code, font vite oublier de
-bouger. Osampo en fait un petit compagnon qui a ses propres besoins :
+Osampo est un petit compagnon qui a ses propres besoins :
 
 - **Besoins.** Le chiot a besoin de bouger, de jouer et de dormir. Sa jauge baisse quand tu
   travailles sans pause ; une promenade, un jeu ou une sieste la remplissent.

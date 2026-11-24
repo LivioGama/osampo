@@ -2,6 +2,17 @@
 
 *[Version française](README.fr.md)*
 
+## Why?
+
+With a coding agent, a session never ends by itself: there is always a task running, a
+question waiting, and "five more minutes, it's almost done". I built Osampo for two things:
+
+1. **Taking breaks.** The puppy gets restless when I sit too long and asks for its walk at
+   the times I set. Saying yes means standing up: the board comes with me and counts my steps.
+2. **Keeping my bedtime.** No more going to bed at 2 a.m. "because Claude is almost done". In
+   the evening, the puppy asks for its last walk, then goes to sleep, and the screen switches
+   to night mode.
+
 **Osampo** (お散歩, *a walk*) is a pixel-art puppy that lives on a small ESP32 screen next to
 your keyboard. It gets bored, sleepy and restless when you sit too long, asks you to take it
 for a walk, and puts its paw on the screen when **Claude Code** is waiting for you. Take the
@@ -19,8 +30,7 @@ dog sits on your taskbar.
 
 ## The idea
 
-Long sessions at the computer, alone or with a coding agent, make it easy to forget to move.
-Osampo turns that into a small companion with needs of its own:
+Osampo is a small companion with needs of its own:
 
 - **Needs.** The puppy needs to move, play and sleep. Its mood gauge drops while you work
   without a break; a walk, a game or a nap fills it again.
